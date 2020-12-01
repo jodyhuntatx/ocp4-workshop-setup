@@ -1,0 +1,134 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: labadmin
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: labadmin
+  name: labadmin
+spec:
+  serviceAccountName: labadmin
+  volumes:
+    - name: conjur-access-token
+      emptyDir:
+        medium: Memory
+
+  containers:
+  - image: {{ APP_IMAGE }}
+    imagePullPolicy: Always
+    name: labadmin
+    env:
+      - name: CYBERARK_NAMESPACE_NAME
+        value: {{ CYBERARK_NAMESPACE_NAME }}
+
+      - name: APP_NAMESPACE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: CONJUR_MASTER_URL
+        valueFrom:
+          configMapKeyRef:
+            name: dap-config
+            key: CONJUR_MASTER_URL
+      - name: CONJUR_ACCOUNT
+        valueFrom:
+          configMapKeyRef:
+            name: dap-config
+            key: CONJUR_ACCOUNT
+      - name: CLUSTER_AUTHN_ID
+        valueFrom:
+          configMapKeyRef:
+            name: dap-config
+            key: CLUSTER_AUTHN_ID
+      - name: CONJUR_AUTHN_TOKEN_FILE
+        valueFrom:
+          configMapKeyRef:
+            name: dap-config
+            key: CONJUR_AUTHN_TOKEN_FILE
+      - name: DAP_POLICY_BRANCH
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "300Mi"
+      limits:
+        cpu: "250m"
+        memory: "300Mi"
+
+    volumeMounts:
+      - mountPath: /run/conjur
+        name: conjur-access-token
+        readOnly: true
+
+  - image: {{ AUTHENTICATOR_IMAGE }}
+    imagePullPolicy: IfNotPresent
+    name: authenticator
+    env:
+                   # hardcoded values
+      - name: CONTAINER_MODE
+        value: sidecar
+
+      - name: CONJUR_AUTHN_LOGIN
+        value: host/{{ APP_NAMESPACE_NAME }}/labadmin
+                
+                   # values from DAP config map
+      - name: CONJUR_AUTHN_URL
+        valueFrom:
+          configMapKeyRef:
+            name: dap-config
+            key: CONJUR_AUTHN_URL
+      - name: CONJUR_VERSION
+        valueFrom:
+          configMapKeyRef:
+            name: dap-config
+            key: CONJUR_VERSION
+      - name: CONJUR_ACCOUNT
+        valueFrom:
+          configMapKeyRef:
+            name: dap-config
+            key: CONJUR_ACCOUNT
+      - name: CONJUR_SSL_CERTIFICATE
+        valueFrom:
+          configMapKeyRef:
+            name: dap-config
+            key: CONJUR_FOLLOWER_CERTIFICATE
+      - name: CONJUR_AUTHN_TOKEN_FILE
+        valueFrom:
+          configMapKeyRef:
+            name: dap-config
+            key: CONJUR_AUTHN_TOKEN_FILE
+
+                   # values from pod metadata
+      - name: MY_POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: MY_POD_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: MY_POD_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "16Mi"
+      limits:
+        cpu: "50m"
+        memory: "16Mi"
+
+    volumeMounts:
+      - mountPath: /run/conjur
+        name: conjur-access-token
+

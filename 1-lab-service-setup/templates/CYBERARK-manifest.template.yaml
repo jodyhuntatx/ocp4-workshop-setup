@@ -1,0 +1,79 @@
+---
+# Create CyberArk namespace for Followers
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ CYBERARK_NAMESPACE_NAME }}
+  labels:
+    name: {{ CYBERARK_NAMESPACE_NAME }}
+
+---
+# Create service account for authentication service
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dap-authn-service
+  namespace: {{ CYBERARK_NAMESPACE_NAME }}
+
+---
+# Create cluster role for authentication service access to pods
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dap-authn-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "serviceaccounts"]
+  verbs: ["get", "list"]
+- apiGroups: ["extensions"]
+  resources: [ "deployments", "replicasets"]
+  verbs: ["get", "list"]
+- apiGroups: ["apps"]
+  resources: [ "deployments", "statefulsets", "replicasets"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create", "get"]
+
+---
+# Grant the authentication service account access to pods in CyberArk namespace
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dap-authn-service
+  namespace: {{ CYBERARK_NAMESPACE_NAME }}
+subjects:
+- kind: ServiceAccount
+  name: dap-authn-service
+  namespace: {{ CYBERARK_NAMESPACE_NAME }}
+roleRef:
+  kind: ClusterRole
+  name: dap-authn-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Cluster role to enable other projects to access and copy the DAP config map
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dap-cm-access-role
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["dap-config"]
+  verbs: ["get", "list"]
+
+---
+# Grant namespace admin role to user {{ CYBERARK_ADMIN_NAME }}
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: project-admin-access-binding
+  namespace: {{ CYBERARK_NAMESPACE_NAME }}
+subjects:
+- kind: User
+  name: {{ CYBERARK_NAMESPACE_ADMIN }}
+roleRef:
+  kind: ClusterRole
+  name: admin
+  apiGroup: rbac.authorization.k8s.io

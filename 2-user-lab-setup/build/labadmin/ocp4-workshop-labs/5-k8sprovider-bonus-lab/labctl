@@ -1,0 +1,120 @@
+#!/bin/bash
+
+source ../dap-app.config
+
+main() {
+  CMD=$1
+    case $CMD in
+    y*)
+        create_yaml_files
+        ;;
+    a*)
+        deploy_app
+        ;;
+    e*)
+        oc exec -it $(oc get pods | grep app-example-provider | grep Running | awk '{print $1}') bash
+        ;;
+    u*)
+	update_secrets
+        ;;
+    d*)
+        reset_lab
+        ;;
+    c*)
+        reset_lab
+        rm -f *.yaml
+        ;;
+    *)
+        echo "Usage: $0 [ yaml | apply | exec | update | delete | clean ]"
+        exit -1
+  esac
+  exit 0
+}
+
+########################
+create_yaml_files() {
+  echo "creating YAML files..."
+  oc get cm dap-config -n $CYBERARK_NAMESPACE_NAME -o yaml				\
+    | sed "s/namespace: $CYBERARK_NAMESPACE_NAME/namespace: $APP_NAMESPACE_NAME/"	\
+    > ./dap-config-cm.yaml
+
+  cat ./templates/dap-k8s-provider-rolebinding.template.yaml	\
+  | sed -e "s#{{ APP_NAMESPACE_NAME }}#$APP_NAMESPACE_NAME#g"	\
+  > ./dap-k8s-provider-rolebinding.yaml
+
+  cat ./templates/app-db-credentials.template.yaml		\
+  | sed -e "s#{{ ACCOUNT_USERNAME }}#$ACCOUNT_USERNAME#g"	\
+  | sed -e "s#{{ ACCOUNT_PASSWORD }}#$ACCOUNT_PASSWORD#g"	\
+  > ./app-db-credentials.yaml
+
+  cat ./templates/dap-k8s-provider-policy.template.yaml		\
+  | sed -e "s#{{ APP_NAMESPACE_NAME }}#$APP_NAMESPACE_NAME#g"		\
+  | sed -e "s#{{ CLUSTER_AUTHN_ID }}#$CLUSTER_AUTHN_ID#g"	\
+  | sed -e "s#{{ SECRETS_ACCESS_ROLE }}#$SECRETS_ACCESS_ROLE#g"	\
+  > ./dap-k8s-provider-policy.yaml
+
+  cat ./templates/dap-k8s-provider-job.template.yaml			\
+  | sed -e "s#{{ APP_IMAGE }}#$APP_IMAGE#g"				\
+  | sed -e "s#{{ SECRETS_PROVIDER_IMAGE }}#$SECRETS_PROVIDER_IMAGE#g"	\
+  | sed -e "s#{{ APP_NAMESPACE_NAME }}#$APP_NAMESPACE_NAME#g"		\
+  | sed -e "s#{{ DB_HOSTNAME }}#$DB_HOSTNAME#g"				\
+  > ./dap-k8s-provider-job.yaml
+
+  cat ./templates/app-deployment.template.yaml				\
+  | sed -e "s#{{ APP_IMAGE }}#$APP_IMAGE#g"				\
+  | sed -e "s#{{ APP_NAMESPACE_NAME }}#$APP_NAMESPACE_NAME#g"		\
+  | sed -e "s#{{ DB_HOSTNAME }}#$DB_HOSTNAME#g"				\
+  > ./app-deployment.yaml
+}
+
+########################
+# apply manifests & policies that deploys app
+deploy_app() {
+  if [[ "$(oc get cm dap-config --ignore-not-found)" == "" ]]; then
+    oc apply -f ./dap-config-cm.yaml
+  fi
+  oc apply -f ./dap-k8s-provider-rolebinding.yaml -n $APP_NAMESPACE_NAME
+  oc apply -f ./app-db-credentials.yaml
+  ../load_policy.sh $APP_NAMESPACE_NAME ./dap-k8s-provider-policy.yaml delete
+
+  oc apply -f ./dap-k8s-provider-job.yaml -n $APP_NAMESPACE_NAME
+  echo -n "Waiting for job to complete"
+  finished="$(oc get pods | grep secrets-provider | grep -i Completed)"
+  while [[ "$finished" == "" ]]; do
+    echo -n "."
+    sleep 2
+    finished="$(oc get pods | grep secrets-provider | grep -i Completed)"
+  done
+  echo
+  oc delete -f ./dap-k8s-provider-job.yaml
+  oc apply -f ./app-deployment.yaml -n $APP_NAMESPACE_NAME	# deploy app
+}
+
+########################
+# run secrets provider job then trigger rolling update of app
+update_secrets() {
+  oc apply -f ./dap-k8s-provider-job.yaml -n $APP_NAMESPACE_NAME
+  echo -n "Waiting for job to complete"
+  finished="$(oc get pods | grep secrets-provider | grep -i Completed)"
+  while [[ "$finished" == "" ]]; do
+    echo -n "."
+    sleep 2
+    finished="$(oc get pods | grep secrets-provider | grep -i Completed)"
+  done
+  echo
+  oc delete -f ./dap-k8s-provider-job.yaml
+	# make benign change to deployment to trigger rolling update
+  oc patch deployment app-example-provider \
+		-p  "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"date\":\"`date +'%s'`\"}}}}}"
+}
+
+########################
+# delete any existing resources/deployments
+reset_lab() {
+  oc delete -f ./app-db-credentials.yaml -n $APP_NAMESPACE_NAME --ignore-not-found
+  oc delete --grace-period=1 -f ./app-deployment.yaml -n $APP_NAMESPACE_NAME --ignore-not-found
+  oc delete --grace-period=1 -f ./dap-k8s-provider-job.yaml -n $APP_NAMESPACE_NAME --ignore-not-found
+  oc delete -f ./dap-k8s-provider-rolebinding.yaml -n $APP_NAMESPACE_NAME --ignore-not-found
+}
+
+main "$@"

@@ -1,0 +1,81 @@
+#!/bin/bash
+
+source ../dap-app.config
+
+main() {
+  CMD=$1
+    case $CMD in
+    y*)
+        create_yaml_files
+        ;;
+    a*)
+        deploy_app
+        ;;
+    e*)
+        oc exec -it $(oc get pods | grep app-example-provider | grep Running | awk '{print $1}') bash
+        ;;
+    d*)
+        reset_lab
+        ;;
+    c*)
+        reset_lab
+        rm -f *.yaml
+        ;;
+    *)
+        echo "Usage: $0 [ yaml | apply | exec | delete | clean ]"
+        exit -1
+  esac
+  exit 0
+}
+
+########################
+create_yaml_files() {
+  echo "creating YAML files..."
+  oc get cm dap-config -n $CYBERARK_NAMESPACE_NAME -o yaml				\
+    | sed "s/namespace: $CYBERARK_NAMESPACE_NAME/namespace: $APP_NAMESPACE_NAME/"	\
+    > ./dap-config-cm.yaml
+
+  cat ./templates/provider-k8ssecrets-manifest.template.yaml	\
+  | sed -e "s#{{ APP_NAMESPACE_NAME }}#$APP_NAMESPACE_NAME#g"	\
+  > ./provider-k8ssecrets-manifest.yaml
+
+  cat ./templates/db-credentials.template.yaml			\
+  | sed -e "s#{{ ACCOUNT_USERNAME }}#$ACCOUNT_USERNAME#g"	\
+  | sed -e "s#{{ ACCOUNT_PASSWORD }}#$ACCOUNT_PASSWORD#g"	\
+  > ./db-credentials.yaml
+
+  cat ./templates/app-k8ssecrets-policy.template.yaml		\
+  | sed -e "s#{{ APP_NAMESPACE_NAME }}#$APP_NAMESPACE_NAME#g"		\
+  | sed -e "s#{{ CLUSTER_AUTHN_ID }}#$CLUSTER_AUTHN_ID#g"	\
+  | sed -e "s#{{ SECRETS_ACCESS_ROLE }}#$SECRETS_ACCESS_ROLE#g"	\
+  > ./app-k8ssecrets-policy.yaml
+
+  cat ./templates/app-k8ssecrets-manifest.template.yaml			\
+  | sed -e "s#{{ APP_IMAGE }}#$APP_IMAGE#g"				\
+  | sed -e "s#{{ SECRETS_PROVIDER_IMAGE }}#$SECRETS_PROVIDER_IMAGE#g"	\
+  | sed -e "s#{{ APP_NAMESPACE_NAME }}#$APP_NAMESPACE_NAME#g"		\
+  | sed -e "s#{{ DB_HOSTNAME }}#$DB_HOSTNAME#g"				\
+  > ./app-k8ssecrets-manifest.yaml
+}
+
+########################
+# instantiate and apply manifest that deploys app
+deploy_app() {
+  if [[ "$(oc get cm dap-config --ignore-not-found)" == "" ]]; then
+    oc apply -f ./dap-config-cm.yaml
+  fi
+  oc apply -f ./provider-k8ssecrets-manifest.yaml -n $APP_NAMESPACE_NAME
+  oc apply -f ./db-credentials.yaml
+  ../load_policy.sh $APP_NAMESPACE_NAME ./app-k8ssecrets-policy.yaml delete
+  oc apply -f ./app-k8ssecrets-manifest.yaml -n $APP_NAMESPACE_NAME
+}
+
+########################
+# delete any existing resources/deployments
+reset_lab() {
+  oc delete -f ./provider-k8ssecrets-manifest.yaml
+  oc delete -f ./db-credentials.yaml -n $APP_NAMESPACE_NAME --ignore-not-found
+  oc delete --grace-period=1 -f ./app-k8ssecrets-manifest.yaml -n $APP_NAMESPACE_NAME --ignore-not-found
+}
+
+main "$@"

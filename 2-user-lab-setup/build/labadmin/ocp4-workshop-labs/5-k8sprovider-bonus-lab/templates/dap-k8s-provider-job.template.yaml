@@ -1,0 +1,74 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: secrets-provider
+spec:
+  ttlSecondsAfterFinished: 0	# K8s 1.12 alpha feature TTL controller
+  template:
+    spec:
+
+      restartPolicy: OnFailure
+
+      containers:
+      - image: {{ SECRETS_PROVIDER_IMAGE }}
+        imagePullPolicy: IfNotPresent
+
+        name: secrets-provider
+        env:
+          - name: CONTAINER_MODE
+            value: application
+
+          - name: CONJUR_AUTHN_LOGIN
+            value: host/{{ APP_NAMESPACE_NAME }}/app-example-k8ssecrets
+
+          - name: SECRETS_DESTINATION
+            value: k8s_secrets
+
+          - name: K8S_SECRETS
+            value: db-credentials
+
+          - name: DEBUG
+            value: "true"
+
+        # values from pod metadata
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+
+        # values from DAP config map
+          - name: CONJUR_VERSION
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_VERSION
+          - name: CONJUR_APPLIANCE_URL
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_APPLIANCE_URL
+          - name: CONJUR_ACCOUNT
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_ACCOUNT
+          - name: CONJUR_SSL_CERTIFICATE
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_FOLLOWER_CERTIFICATE
+          - name: CONJUR_AUTHN_URL
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_AUTHN_URL
+

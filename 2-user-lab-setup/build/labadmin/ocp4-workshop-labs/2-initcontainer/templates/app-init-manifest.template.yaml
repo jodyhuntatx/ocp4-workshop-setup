@@ -1,0 +1,135 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-example-init
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: app-example-init
+  name: app-example-init
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app-example-init
+  template:
+    metadata:
+      labels:
+        app: app-example-init
+    spec:
+      serviceAccountName: app-example-init
+ 
+      containers:
+      - image: {{ APP_IMAGE }}
+        imagePullPolicy: IfNotPresent
+        name: test-app
+        env:
+          - name: DB_HOSTNAME
+            value: {{ DB_HOSTNAME }}
+
+        # values from DAP config map
+          - name: CONJUR_VERSION
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_VERSION
+          - name: CONJUR_ACCOUNT
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_ACCOUNT
+          - name: CONJUR_APPLIANCE_URL
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_APPLIANCE_URL
+          - name: CONJUR_SSL_CERTIFICATE
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_FOLLOWER_CERTIFICATE
+          - name: CONJUR_AUTHN_TOKEN_FILE
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_AUTHN_TOKEN_FILE
+        resources:
+          requests:
+            cpu: "300m"
+            memory: "250Mi"
+          limits:
+            cpu: "300m"
+            memory: "250Mi"
+        volumeMounts:
+          - mountPath: /run/conjur
+            name: conjur-access-token
+            readOnly: true
+
+      initContainers:
+      - image: {{ AUTHENTICATOR_IMAGE }}
+        imagePullPolicy: IfNotPresent
+        name: authenticator
+        env:
+
+        # hardcoded values
+          - name: CONTAINER_MODE
+            value: init
+
+          - name: CONJUR_AUTHN_LOGIN
+            value: host/{{ APP_NAMESPACE_NAME }}/app-example-init
+
+        # values from DAP config map
+          - name: CONJUR_VERSION
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_VERSION
+          - name: CONJUR_ACCOUNT
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_ACCOUNT
+          - name: CONJUR_SSL_CERTIFICATE
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_FOLLOWER_CERTIFICATE
+          - name: CONJUR_AUTHN_URL
+            valueFrom:
+              configMapKeyRef:
+                name: dap-config
+                key: CONJUR_AUTHN_URL
+
+        # values from pod metadata
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "16Mi"
+          limits:
+            cpu: "50m"
+            memory: "16Mi"
+        volumeMounts:
+          - mountPath: /run/conjur
+            name: conjur-access-token
+
+      volumes:
+        - name: conjur-access-token
+          emptyDir:
+            medium: Memory

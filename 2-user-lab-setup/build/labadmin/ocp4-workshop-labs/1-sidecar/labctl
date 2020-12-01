@@ -1,0 +1,68 @@
+#!/bin/bash
+
+source ../dap-app.config
+
+main() {
+  CMD=$1
+  case $CMD in
+    y*)
+	create_yaml_files
+	;;
+    a*)
+	deploy_app
+	;;
+    e*)
+        oc exec -it $(oc get pods | grep app-example-sidecar | grep Running | awk '{print $1}') -- bash
+        ;;
+    d*)
+	reset_lab
+	;;
+    c*)
+	reset_lab
+  	rm -f *.yaml
+	;;
+    *)
+	echo "Usage: $0 [ yaml | apply | exec | delete | clean ]"
+	exit -1
+  esac
+  exit 0
+}
+
+########################
+create_yaml_files() {
+  echo "creating YAML files..."
+  cat ./templates/app-sidecar-policy.template.yaml		\
+  | sed -e "s#{{ APP_NAMESPACE_NAME }}#$APP_NAMESPACE_NAME#g"	\
+  | sed -e "s#{{ CLUSTER_AUTHN_ID }}#$CLUSTER_AUTHN_ID#g"	\
+  | sed -e "s#{{ SECRETS_ACCESS_ROLE }}#$SECRETS_ACCESS_ROLE#g"	\
+  > ./app-sidecar-policy.yaml
+
+  oc get cm dap-config -n $CYBERARK_NAMESPACE_NAME -o yaml				\
+    | sed "s/namespace: $CYBERARK_NAMESPACE_NAME/namespace: $APP_NAMESPACE_NAME/"	\
+    > ./dap-config-cm.yaml
+
+  cat ./templates/app-sidecar-manifest.template.yaml			\
+  | sed -e "s#{{ APP_IMAGE }}#$APP_IMAGE#g"				\
+  | sed -e "s#{{ AUTHENTICATOR_IMAGE }}#$AUTHENTICATOR_IMAGE#g"		\
+  | sed -e "s#{{ APP_NAMESPACE_NAME }}#$APP_NAMESPACE_NAME#g"		\
+  | sed -e "s#{{ DB_HOSTNAME }}#$DB_HOSTNAME#g"				\
+  > ./app-sidecar-manifest.yaml
+}
+
+########################
+# apply yaml files to deploy app
+deploy_app() {
+  ../load_policy.sh $DAP_POLICY_BRANCH ./app-sidecar-policy.yaml
+  if [[ "$(oc get cm dap-config --ignore-not-found)" == "" ]]; then
+    oc apply -f ./dap-config-cm.yaml
+  fi
+  oc apply -f ./app-sidecar-manifest.yaml -n $APP_NAMESPACE_NAME
+}
+
+########################
+# delete deployments, cm, etc.
+reset_lab() {
+  oc delete --grace-period=1 -f ./app-sidecar-manifest.yaml -n $APP_NAMESPACE_NAME --ignore-not-found
+}
+
+main "$@"

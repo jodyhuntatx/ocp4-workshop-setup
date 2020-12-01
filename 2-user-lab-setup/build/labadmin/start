@@ -1,0 +1,13 @@
+#!/bin/bash
+CLI_IMAGE=jodyhuntatx/labctl:latest
+CLI_CONTAINER_NAME=labctl
+
+./stop
+docker run -d \
+    --name $CLI_CONTAINER_NAME \
+    --restart always \
+    --entrypoint bash \
+    $CLI_IMAGE \
+    -c "sleep infinity"
+
+docker exec -it $CLI_CONTAINER_NAME bash

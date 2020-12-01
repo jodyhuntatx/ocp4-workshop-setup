@@ -1,0 +1,61 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: app-example-provider
+  name: app-example-provider
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app-example-provider
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+  template:
+    metadata:
+      labels:
+        app: app-example-provider
+    spec:
+
+      containers:
+      - image: {{ APP_IMAGE }}
+        imagePullPolicy: IfNotPresent
+        name: test-app
+        env:
+
+          - name: DB_HOSTNAME
+            value: {{ DB_HOSTNAME }}
+
+          - name: DB_UNAME
+            valueFrom:
+              secretKeyRef:
+                name: db-credentials
+                key: username
+
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: db-credentials
+                key: password
+
+        volumeMounts:
+          - name: secret-volume
+            mountPath: /etc/secret-volume
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 250Mi
+          limits:
+            cpu: 50m
+            memory: 250Mi
+
+      volumes:
+        - name: secret-volume
+          secret:
+            secretName: db-credentials

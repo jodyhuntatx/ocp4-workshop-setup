@@ -1,0 +1,15 @@
+---
+# Grant {{ APP_NAMESPACE_ADMIN }} user & labadmin SA read-only access to the DAP config map
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dap-cm-access-{{ APP_NAMESPACE_ADMIN }}
+roleRef:
+  kind: ClusterRole
+  name: dap-cm-access-role
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: User
+  name: {{ APP_NAMESPACE_ADMIN }}
+- kind: User
+  name: system:serviceaccount:{{ APP_NAMESPACE_NAME }}:labadmin

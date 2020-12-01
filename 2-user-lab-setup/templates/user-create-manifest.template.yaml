@@ -1,0 +1,9 @@
+---
+# Define namespace user
+apiVersion: user.openshift.io/v1
+kind: User
+metadata:
+  name: {{ APP_NAMESPACE_NAME }}
+fullName: CyberArk Lab {{ APP_NAMESPACE_NAME }}
+identities:
+  - '{{ LAB_HTPASS_PROVIDER }}:{{ APP_NAMESPACE_NAME }}'

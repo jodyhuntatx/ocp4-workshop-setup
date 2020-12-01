@@ -1,0 +1,41 @@
+---
+# Define project namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ APP_NAMESPACE_NAME }}
+  labels:
+    name: {{ APP_NAMESPACE_NAME }}
+
+---
+# Grant the authentication service access to pods in {{ APP_NAMESPACE_NAME }} namespace
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dap-authn-service
+  namespace: {{ APP_NAMESPACE_NAME }}
+subjects:
+- kind: ServiceAccount
+  name: dap-authn-service
+  namespace: {{ CYBERARK_NAMESPACE_NAME }}
+roleRef:
+  kind: ClusterRole
+  name: dap-authn-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Grant namespace admin privileges to {{ APP_NAMESPACE_ADMIN }} user & labadmin SA
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: namespace-admin
+  namespace: {{ APP_NAMESPACE_NAME }}
+subjects:
+- kind: User
+  name: {{ APP_NAMESPACE_ADMIN }}
+- kind: User
+  name: system:serviceaccount:{{ APP_NAMESPACE_NAME }}:labadmin
+roleRef:
+  kind: ClusterRole
+  name: admin
+  apiGroup: rbac.authorization.k8s.io

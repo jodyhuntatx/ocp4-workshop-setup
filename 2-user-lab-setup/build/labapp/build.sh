@@ -1,2 +1,4 @@
 #!/bin/bash -e
-docker build -t $APP_IMAGE .
+source ../../../dap-service.config
+docker build -t $REGISTRY_LABAPP_IMAGE .
+docker push $REGISTRY_LABAPP_IMAGE

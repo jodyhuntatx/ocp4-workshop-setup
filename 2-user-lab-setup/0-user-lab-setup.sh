@@ -152,7 +152,7 @@ deploy_labadmin() {
     | sed -e "s#{{ CYBERARK_NAMESPACE_NAME }}#$CYBERARK_NAMESPACE_NAME#g"	\
     | sed -e "s#{{ APP_NAMESPACE_NAME }}#$uname#g"				\
     | sed -e "s#{{ APP_IMAGE }}#$REGISTRY_LABADMIN_IMAGE#g"			\
-    | sed -e "s#{{ AUTHENTICATOR_IMAGE }}#$AUTHENTICATOR_IMAGE #g"		\
+    | sed -e "s#{{ AUTHENTICATOR_IMAGE }}#$REGISTRY_AUTHENTICATOR_IMAGE #g"		\
     > ./$uname-dap-labadmin-manifest.yaml
     oc apply -f ./$uname-dap-labadmin-manifest.yaml -n $uname
   done

@@ -1,0 +1,9 @@
+---
+# Define namespace user
+apiVersion: user.openshift.io/v1
+kind: User
+metadata:
+  name: user1
+fullName: CyberArk Lab user1
+identities:
+  - 'htpasswd:user1'

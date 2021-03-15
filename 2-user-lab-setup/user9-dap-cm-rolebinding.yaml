@@ -1,0 +1,15 @@
+---
+# Grant user9 user & labadmin SA read-only access to the DAP config map
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dap-cm-access-user9
+roleRef:
+  kind: ClusterRole
+  name: dap-cm-access-role
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: User
+  name: user9
+- kind: User
+  name: system:serviceaccount:user9:labadmin

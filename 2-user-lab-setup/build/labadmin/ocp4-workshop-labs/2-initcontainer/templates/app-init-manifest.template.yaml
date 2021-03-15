@@ -57,13 +57,15 @@ spec:
               configMapKeyRef:
                 name: dap-config
                 key: CONJUR_AUTHN_TOKEN_FILE
-        resources:
-          requests:
-            cpu: "300m"
-            memory: "250Mi"
-          limits:
-            cpu: "300m"
-            memory: "250Mi"
+
+#        resources:
+#          requests:
+#            cpu: "300m"
+#            memory: "250Mi"
+#          limits:
+#            cpu: "300m"
+#            memory: "250Mi"
+
         volumeMounts:
           - mountPath: /run/conjur
             name: conjur-access-token
@@ -118,13 +120,14 @@ spec:
               fieldRef:
                 fieldPath: status.podIP
 
-        resources:
-          requests:
-            cpu: "50m"
-            memory: "16Mi"
-          limits:
-            cpu: "50m"
-            memory: "16Mi"
+#        resources:
+#          requests:
+#            cpu: "50m"
+#            memory: "16Mi"
+#          limits:
+#            cpu: "50m"
+#            memory: "16Mi"
+
         volumeMounts:
           - mountPath: /run/conjur
             name: conjur-access-token

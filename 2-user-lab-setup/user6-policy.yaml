@@ -1,0 +1,30 @@
+# User is only used for user login to DAP UI
+- !user user6
+
+# Host is the admin identity for the policy branch
+- !host
+  id: user6/labadmin
+  annotations:
+    authn-k8s/namespace: user6					# namespace it runs in
+    authn-k8s/service-account: labadmin 			# namespace SA it runs as 
+    authn-k8s/authentication-container-name: authenticator	# name of authenticator container in pod
+
+- !policy
+  id: user6
+  owner: !host user6/labadmin
+  body:
+  - !group apps
+
+# Grant consumer roles for authn-k8s & safe to apps role
+# Apps role is granted to identities created in labs
+- !grant
+  roles:
+  - !group conjur/authn-k8s/cyberlab/consumers	# group w/ authentication permissions in cluster
+  - !group LabVault/Labs/LabSafe1/delegation/consumers 			# group role w/ access to secrets in safe
+  members:
+  - !group user6/apps
+
+# Grant user the admin role for the policy namespace 
+- !grant
+  role: !host user6/labadmin
+  member: !user user6

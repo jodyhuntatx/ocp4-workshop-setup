@@ -19,12 +19,12 @@ spec:
         medium: Memory
 
   containers:
-  - image: {{ APP_IMAGE }}
+  - image: jodyhuntatx/labadmin:norsrcs
     imagePullPolicy: Always
     name: labadmin
     env:
       - name: CYBERARK_NAMESPACE_NAME
-        value: {{ CYBERARK_NAMESPACE_NAME }}
+        value: cyberlab
 
       - name: APP_NAMESPACE_NAME
         valueFrom:
@@ -68,7 +68,7 @@ spec:
         name: conjur-access-token
         readOnly: true
 
-  - image: {{ AUTHENTICATOR_IMAGE }}
+  - image: cyberark/conjur-authn-k8s-client:latest 
     imagePullPolicy: IfNotPresent
     name: authenticator
     env:
@@ -77,7 +77,7 @@ spec:
         value: sidecar
 
       - name: CONJUR_AUTHN_LOGIN
-        value: host/{{ APP_NAMESPACE_NAME }}/labadmin
+        value: host/user8/labadmin
                 
                    # values from DAP config map
       - name: CONJUR_AUTHN_URL
